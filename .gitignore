@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Environment variables
+.env
+
+# Chat history and temporary files
+app_chat_history.json
+temp*.pdf
+
+# FAISS index (can be regenerated)
+faiss_index/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
