@@ -16,9 +16,14 @@ import os
 import uuid
 from prompts import system_prompt
 
-# Load environment variables and set HuggingFace token
+# Load environment variables for local development
 load_dotenv()
-os.environ["HF_TOKEN"] = os.getenv("HF_TOKEN")
+
+# Set API keys from secrets (for Streamlit Cloud) or env vars
+groq_api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
+hf_token = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
+if hf_token:
+    os.environ["HF_TOKEN"] = hf_token
 
 # --- Streamlit State Initialization ---
 # Persistent state for all document and chat management
@@ -49,15 +54,14 @@ st.markdown("<h1 style='text-align: center;'>Chat with AI Agent</h1>", unsafe_al
 with st.sidebar:
     st.title("Settings")
     # API Key management
-    try:
-        groq_api_key = os.getenv("GROQ_API_KEY")
-        llm = ChatGroq(model="gemma2-9b-it", api_key=groq_api_key)
-    except Exception as e:
-        st.error(f"Groq API Key is not set: {e}")
-        st.stop()
-    else:
-        st.subheader("Groq API Key")
+    st.subheader("Groq API Key")
+    if not groq_api_key:
         groq_api_key = st.text_input("Enter your Groq API Key", type="password")
+    if groq_api_key:
+        llm = ChatGroq(model="gemma2-9b-it", api_key=groq_api_key)
+    else:
+        st.error("Groq API Key is required.")
+        st.stop()
 
     st.subheader(f"Documents Stored: {st.session_state['papers_count']}", divider=True)
     # PDF Upload (with key reset to prevent repeated processing)
@@ -196,9 +200,3 @@ if groq_api_key:
                             st.write(msg.content)
 else:
     st.warning("Please enter a valid API key in the sidebar to start.")
-
-
-
-
-
-
