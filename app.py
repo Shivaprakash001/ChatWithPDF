@@ -58,7 +58,7 @@ with st.sidebar:
     if not groq_api_key:
         groq_api_key = st.text_input("Enter your Groq API Key", type="password")
     if groq_api_key:
-        llm = ChatGroq(model="gemma2-9b-it", api_key=groq_api_key)
+        llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=groq_api_key)
     else:
         st.error("Groq API Key is required.")
         st.stop()
