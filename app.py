@@ -15,6 +15,8 @@ from langchain_core.chat_history import BaseChatMessageHistory
 import os
 import uuid
 from prompts import system_prompt
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 
 # Load environment variables for local development
 load_dotenv()
@@ -78,7 +80,12 @@ with st.sidebar:
                     f.write(file.getvalue())
                 pdf_loader = PyPDFLoader(temppdf)
                 docs = pdf_loader.load()
-                st.session_state['Document_store'].extend(docs)
+                
+                # Split into overlapping chunks
+                splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                split_docs = splitter.split_documents(docs)
+                
+                st.session_state['Document_store'].extend(split_docs)
                 st.toast(f"Loaded document {file.name} as {len(docs)} pages.")
                 os.remove(temppdf)
             st.session_state['papers_count'] = len(st.session_state['Document_store'])
@@ -93,8 +100,10 @@ with st.sidebar:
     if st.button("Add Webpage", key="add_webpage") and new_url:
         loader = WebBaseLoader(new_url)
         docs = loader.load()
-        st.session_state['web_links'].append({"url": new_url, "docs": docs})
-        st.session_state['Document_store'].extend(docs)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        split_docs = splitter.split_documents(docs)
+        st.session_state['web_links'].append({"url": new_url, "docs": split_docs})
+        st.session_state['Document_store'].extend(split_docs)
         st.session_state['papers_count'] = len(st.session_state['Document_store'])
         st.toast(f"Loaded URL content as {len(docs)} pages.")
 
