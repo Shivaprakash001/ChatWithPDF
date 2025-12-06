@@ -53,6 +53,8 @@ if 'pdf_uploaded' not in st.session_state:
 # --- Streamlit UI ---
 st.markdown("<h1 style='text-align: center;'>Chat with AI Agent</h1>", unsafe_allow_html=True)
 
+if not st.session_state['Document_store']:
+    st.markdown("<h4 style='text-align: center;'>Upload your doucment and get started...</h1>", unsafe_allow_html=True)
 with st.sidebar:
     st.title("Settings")
     # API Key management
