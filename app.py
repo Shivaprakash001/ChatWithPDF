@@ -54,15 +54,16 @@ st.markdown("<h1 style='text-align: center;'>Chat with AI Agent</h1>", unsafe_al
 with st.sidebar:
     st.title("Settings")
     # API Key management
-    st.subheader("Groq API Key")
+
     if not groq_api_key:
+        st.subheader("Groq API Key")
         groq_api_key = st.text_input("Enter your Groq API Key", type="password")
     if groq_api_key:
         llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=groq_api_key)
     else:
         st.error("Groq API Key is required.")
         st.stop()
-
+ 
     st.subheader(f"Documents Stored: {st.session_state['papers_count']}", divider=True)
     # PDF Upload (with key reset to prevent repeated processing)
     uploaded_files = st.file_uploader(
