@@ -171,9 +171,9 @@ if groq_api_key:
         retriever = st.session_state['retriever']
         try:
             # Set up agent and tools
-            arxiv = ArxivQueryRun(api_wrapper=ArxivAPIWrapper(), description="If you need to search for any information from Arxiv online beyond the document store, use this tool for answering the question")
-            wiki = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper(), description="If you need to search for any information from wikipedia beyond the document store, use this tool for answering the question")
-            search = DuckDuckGoSearchResults(api_wrapper=DuckDuckGoSearchAPIWrapper(), description="Search engine: If we need to search for any information online beyond the document store, use this tool for answering the question")
+            arxiv = ArxivQueryRun(api_wrapper=ArxivAPIWrapper(), name="arxiv", description="If you need to search for any information from Arxiv online beyond the document store, use this tool for answering the question")
+            wiki = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper(), name="wikipedia", description="If you need to search for any information from wikipedia beyond the document store, use this tool for answering the question")
+            search = DuckDuckGoSearchResults(api_wrapper=DuckDuckGoSearchAPIWrapper(), name="duckduckgo", description="Search engine: If we need to search for any information online beyond the document store, use this tool for answering the question")
             Document_Retriever = create_retriever_tool(
                 retriever,
                 name="Document_Retriever",
