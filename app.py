@@ -201,14 +201,17 @@ if groq_api_key:
         # Chat input and response display
         if query := st.chat_input("Enter your message"):
             with st.spinner("Thinking..."):
-                response = runnable_agent.invoke({"input": query}, config={"configurable": {"session_id": session_id}})
-                session_history = get_session_history(session_id)
-                for msg in session_history.messages:
-                    if msg.type == 'human':
-                        with st.chat_message("user"):
-                            st.write(msg.content)
-                    else:
-                        with st.chat_message("assistant"):
-                            st.write(msg.content)
+                try:
+                    response = runnable_agent.invoke({"input": query}, config={"configurable": {"session_id": session_id}})
+                    session_history = get_session_history(session_id)
+                    for msg in session_history.messages:
+                        if msg.type == 'human':
+                            with st.chat_message("user"):
+                                st.write(msg.content)
+                        else:
+                            with st.chat_message("assistant"):
+                                st.write(msg.content)
+                except Exception as e:
+                    st.error(f"An error occurred: {str(e)}")
 else:
     st.warning("Please enter a valid API key in the sidebar to start.")
