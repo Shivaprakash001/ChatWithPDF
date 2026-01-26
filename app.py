@@ -107,14 +107,21 @@ if api_key:
         except Exception as e:
             st.error(f"Failed to load website: {e}")
 
+    # Persist data across reruns
     if documents:
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=300)
-        chunks = text_splitter.split_documents(documents)
-        st.write(f"Processed {len(documents)} document(s) into {len(chunks)} chunks.")
+        if 'vectorstore' not in st.session_state or uploaded_files or (web_url and load_web_button):
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=300)
+            chunks = text_splitter.split_documents(documents)
+            st.write(f"Processed {len(documents)} document(s) into {len(chunks)} chunks.")
 
-        vectorstore = Chroma.from_documents(chunks, embeddings, persist_directory="./chroma_db")
-        retriever = vectorstore.as_retriever()
+            st.session_state.vectorstore = Chroma.from_documents(
+                chunks, 
+                embeddings, 
+                persist_directory="./chroma_db"
+            )
+            st.session_state.retriever = st.session_state.vectorstore.as_retriever()
 
+    if 'vectorstore' in st.session_state:
         contextualized_q_prompt = ChatPromptTemplate.from_messages([
             ("system", "Given chat history and a question, retrieve relevant documents. Do not answer. Use chat history to form standalone questions."),
             MessagesPlaceholder(variable_name="chat_history"),
@@ -122,7 +129,7 @@ if api_key:
         ])
 
         history_aware_retriever = create_history_aware_retriever(
-            retriever=retriever,
+            retriever=st.session_state.retriever,
             prompt=contextualized_q_prompt,
             llm=llm,
         )
@@ -146,6 +153,8 @@ if api_key:
         rag_chain = create_retrieval_chain(history_aware_retriever, stuff_chain)
 
         def get_session_history(session_id) -> BaseChatMessageHistory:
+            if 'chat_history' not in st.session_state:
+                st.session_state.chat_history = {}
             if session_id not in st.session_state.chat_history:
                 st.session_state.chat_history[session_id] = ChatMessageHistory()
             return st.session_state.chat_history[session_id]
@@ -158,24 +167,30 @@ if api_key:
             output_messages_key="answer",
         )
 
+        # Display Chat History FIRST
+        session_history = get_session_history(session_id)
+        for msg in session_history.messages:
+            if msg.type == 'human':
+                with st.chat_message("user"):
+                    st.write(msg.content)
+            else:
+                with st.chat_message("assistant"):
+                    st.write(msg.content)
+
         user_input = st.chat_input("Ask your question here...")
 
         if user_input:
-            response = conversational_rag_chain.invoke(
-                {"input": user_input},
-                config={"configurable": {"session_id": session_id}}
-            )
-            
+            # Display current user message immediately
+            with st.chat_message("user"):
+                st.write(user_input)
 
-            session_history = get_session_history(session_id)
-
-            for msg in session_history.messages:
-                if msg.type == 'human':
-                    with st.chat_message("user"):
-                        st.write(msg.content)
-                else:
-                    with st.chat_message("assistant"):
-                        st.write(msg.content)
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    response = conversational_rag_chain.invoke(
+                        {"input": user_input},
+                        config={"configurable": {"session_id": session_id}}
+                    )
+                    st.write(response['answer'])
 
 else:
     st.warning("Please enter a valid API key in the sidebar to start.")
