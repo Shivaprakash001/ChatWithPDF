@@ -39,9 +39,9 @@ with st.sidebar:
     st.subheader("Upload & Manage")
     uploaded_files = st.file_uploader("Upload PDF files", type=["pdf"], accept_multiple_files=True)
 
-    # st.subheader("Web Loader")
-    # web_url = st.text_input("Enter Website URL")
-    # load_web_button = st.button("Load Web Content")
+    st.subheader("Web Loader")
+    web_url = st.text_input("Enter Website URL")
+    load_web_button = st.button("Load Web Content")
 
     st.subheader("API Settings")
     api_key = os.getenv("GROQ_API_KEY")
@@ -98,14 +98,14 @@ if api_key:
             docs = loader.load()
             documents.extend(docs)
             os.remove(temp_pdf)
-    # if load_web_button and web_url:
-    #     try:
-    #         web_loader = WebBaseLoader(web_url)
-    #         web_docs = web_loader.load()
-    #         documents.extend(web_docs)
-    #         st.success(f"Loaded {len(web_docs)} documents from website.")
-    #     except Exception as e:
-    #         st.error(f"Failed to load website: {e}")
+    if web_url and load_web_button:
+        try:
+            web_loader = WebBaseLoader(web_url)
+            web_docs = web_loader.load()
+            documents.extend(web_docs)
+            st.success(f"Loaded {len(web_docs)} documents from website.")
+        except Exception as e:
+            st.error(f"Failed to load website: {e}")
 
     if documents:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=300)
