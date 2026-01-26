@@ -43,12 +43,16 @@ with st.sidebar:
     # web_url = st.text_input("Enter Website URL")
     # load_web_button = st.button("Load Web Content")
 
-    try:
-        api_key=os.getenv("GROQ_API_KEY")
-    except:
-        st.subheader("API Settings")
+    st.subheader("API Settings")
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
         api_key = st.text_input("Groq API Key", type="password")
-
+    
+    groq_model = st.selectbox(
+        "Select Groq Model",
+        ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
+    )
+    
     st.subheader("Session Management")
     session_id = st.text_input("Session ID", value="default_session")
 
@@ -76,7 +80,7 @@ st.write("Upload a PDF file in the sidebar and chat below.")
 if api_key:
     documents = []
     try:
-        llm = ChatGroq(model_name="Gemma2-9b-It", api_key=api_key)
+        llm = ChatGroq(model_name=groq_model, api_key=api_key)
     except Exception as e:
         st.error(f"Error with API key: {e}")
         st.stop()
