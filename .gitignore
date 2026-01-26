@@ -1,0 +1,13 @@
+# Existing entries
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv/
+
+# Additional for your project
+.env
+chroma_db/
+*.db
