@@ -135,17 +135,13 @@ if api_key:
     # Rebuild vectorstore if needed
     if st.session_state.all_documents and 'vectorstore' not in st.session_state:
         with st.spinner("Indexing content..."):
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
             chunks = text_splitter.split_documents(st.session_state.all_documents)
             
-            # Clean old DB before rebuild to avoid duplicate issues
-            if os.path.exists("./chroma_db"):
-                shutil.rmtree("./chroma_db", ignore_errors=True)
-                
+            # Use in-memory Chroma to avoid Streamlit Cloud 'readonly database' errors
             st.session_state.vectorstore = Chroma.from_documents(
                 chunks, 
-                embeddings, 
-                persist_directory="./chroma_db"
+                embeddings
             )
             st.session_state.retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 5})
 
