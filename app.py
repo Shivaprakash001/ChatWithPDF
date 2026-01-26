@@ -11,8 +11,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 import os
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader
 import shutil
 
 # Load environment variables
@@ -30,20 +29,72 @@ def get_embeddings():
 embeddings = get_embeddings()
 
 # Streamlit page configuration
-st.set_page_config(page_title="Chat with your Notes", page_icon="🔖")
+st.set_page_config(page_title="Chat with your Notes", page_icon="🔖", layout="wide")
+
+# Initialize session states
+if 'all_documents' not in st.session_state:
+    st.session_state.all_documents = []
+if 'loaded_sources' not in st.session_state:
+    st.session_state.loaded_sources = []
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = {}
 
 # Sidebar controls
 with st.sidebar:
     st.header("Settings")
 
-    st.subheader("Upload & Manage")
-    uploaded_files = st.file_uploader("Upload PDF files", type=["pdf"], accept_multiple_files=True)
+    st.subheader("📁 Upload PDFs")
+    uploaded_files = st.file_uploader("Choose PDF files", type=["pdf"], accept_multiple_files=True)
+    if st.button("Add PDFs"):
+        if uploaded_files:
+            new_docs_count = 0
+            for file in uploaded_files:
+                if file.name not in st.session_state.loaded_sources:
+                    temp_pdf = f"./temp_{file.name}"
+                    with open(temp_pdf, "wb") as f:
+                        f.write(file.getvalue())
+                    
+                    try:
+                        loader = PyPDFLoader(temp_pdf)
+                        docs = loader.load()
+                        st.session_state.all_documents.extend(docs)
+                        st.session_state.loaded_sources.append(file.name)
+                        new_docs_count += 1
+                    finally:
+                        if os.path.exists(temp_pdf):
+                            os.remove(temp_pdf)
+            if new_docs_count > 0:
+                st.success(f"Added {new_docs_count} new PDF(s)")
+                st.session_state.pop('vectorstore', None) # Force rebuild
+            else:
+                st.info("Files already added or no files selected.")
 
-    st.subheader("Web Loader")
-    web_url = st.text_input("Enter Website URL")
-    load_web_button = st.button("Load Web Content")
+    st.subheader("🌐 Load Website")
+    web_url = st.text_input("Enter URL")
+    if st.button("Add URL"):
+        if web_url:
+            if web_url not in st.session_state.loaded_sources:
+                with st.spinner("Scraping website..."):
+                    try:
+                        web_loader = WebBaseLoader(web_url)
+                        web_docs = web_loader.load()
+                        st.session_state.all_documents.extend(web_docs)
+                        st.session_state.loaded_sources.append(web_url)
+                        st.success(f"Loaded content from {web_url}")
+                        st.session_state.pop('vectorstore', None) # Force rebuild
+                    except Exception as e:
+                        st.error(f"Failed to load website: {e}")
+            else:
+                st.warning("URL already added.")
 
-    st.subheader("API Settings")
+    st.subheader("📖 Loaded Sources")
+    if st.session_state.loaded_sources:
+        for i, source in enumerate(st.session_state.loaded_sources):
+            st.text(f"{i+1}. {source[:30]}...")
+    else:
+        st.info("No sources loaded yet.")
+
+    st.subheader("⚙️ API Settings")
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         api_key = st.text_input("Groq API Key", type="password")
@@ -53,73 +104,50 @@ with st.sidebar:
         ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
     )
     
-    st.subheader("Session Management")
+    st.subheader("🧼 Cleanup")
     session_id = st.text_input("Session ID", value="default_session")
-
     if st.button("Reset Chat"):
-        if 'chat_history' in st.session_state and session_id in st.session_state.chat_history:
+        if session_id in st.session_state.chat_history:
             st.session_state.chat_history[session_id] = ChatMessageHistory()
         st.success("Chat history reset.")
 
-    st.subheader("Clear Database")
-    if st.button("Clear Database"):
+    if st.button("Clear All Data"):
         if os.path.exists("./chroma_db"):
             shutil.rmtree("./chroma_db", ignore_errors=True)
-            st.session_state.pop('documents', None)
-            st.session_state.pop('vectorstore', None)
-            st.session_state.pop('retriever', None)
-            st.session_state.pop('chunks', None)
-            st.success("Database and documents cleared.")
-        else:
-            st.warning("No database found.")
+        st.session_state.all_documents = []
+        st.session_state.loaded_sources = []
+        st.session_state.pop('vectorstore', None)
+        st.session_state.pop('retriever', None)
+        st.success("All documents and vectorstore cleared.")
 
 # Main Interface
-st.title("Chat with your Notes")
-st.write("Upload a PDF file in the sidebar and chat below.")
+st.title("🔖 Chat with your Notes & Web")
+st.write("Combined PDF and Web content analyzer.")
+
 # Core Logic
 if api_key:
-    documents = []
     try:
         llm = ChatGroq(model_name=groq_model, api_key=api_key)
     except Exception as e:
         st.error(f"Error with API key: {e}")
         st.stop()
 
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = {}
-
-    if uploaded_files:
-        for file in uploaded_files:
-            temp_pdf = f"./temp_{file.name}"
-            with open(temp_pdf, "wb") as f:
-                f.write(file.getvalue())
-
-            loader = PyPDFLoader(temp_pdf)
-            docs = loader.load()
-            documents.extend(docs)
-            os.remove(temp_pdf)
-    if web_url and load_web_button:
-        try:
-            web_loader = WebBaseLoader(web_url)
-            web_docs = web_loader.load()
-            documents.extend(web_docs)
-            st.success(f"Loaded {len(web_docs)} documents from website.")
-        except Exception as e:
-            st.error(f"Failed to load website: {e}")
-
-    # Persist data across reruns
-    if documents:
-        if 'vectorstore' not in st.session_state or uploaded_files or (web_url and load_web_button):
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=300)
-            chunks = text_splitter.split_documents(documents)
-            st.write(f"Processed {len(documents)} document(s) into {len(chunks)} chunks.")
-
+    # Rebuild vectorstore if needed
+    if st.session_state.all_documents and 'vectorstore' not in st.session_state:
+        with st.spinner("Indexing content..."):
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
+            chunks = text_splitter.split_documents(st.session_state.all_documents)
+            
+            # Clean old DB before rebuild to avoid duplicate issues
+            if os.path.exists("./chroma_db"):
+                shutil.rmtree("./chroma_db", ignore_errors=True)
+                
             st.session_state.vectorstore = Chroma.from_documents(
                 chunks, 
                 embeddings, 
                 persist_directory="./chroma_db"
             )
-            st.session_state.retriever = st.session_state.vectorstore.as_retriever()
+            st.session_state.retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 5})
 
     if 'vectorstore' in st.session_state:
         contextualized_q_prompt = ChatPromptTemplate.from_messages([
@@ -136,10 +164,9 @@ if api_key:
 
         system_prompt = """
         You are a concise, professional assistant.
-        Only answer questions directly based on the provided document context.
+        Only answer questions directly based on the provided document and website context.
         If unsure, respond with "I don't know."
-        If the question is not related to the documents, ask for more clarification.
-        Try to give every information that relates the question in a structured way. 
+        Try to synthesize information from both PDFs and websites if applicable.
         Context: {context}
         """
 
@@ -152,12 +179,10 @@ if api_key:
         stuff_chain = create_stuff_documents_chain(llm, qa_prompt)
         rag_chain = create_retrieval_chain(history_aware_retriever, stuff_chain)
 
-        def get_session_history(session_id) -> BaseChatMessageHistory:
-            if 'chat_history' not in st.session_state:
-                st.session_state.chat_history = {}
-            if session_id not in st.session_state.chat_history:
-                st.session_state.chat_history[session_id] = ChatMessageHistory()
-            return st.session_state.chat_history[session_id]
+        def get_session_history(sid) -> BaseChatMessageHistory:
+            if sid not in st.session_state.chat_history:
+                st.session_state.chat_history[sid] = ChatMessageHistory()
+            return st.session_state.chat_history[sid]
 
         conversational_rag_chain = RunnableWithMessageHistory(
             rag_chain,
@@ -167,30 +192,28 @@ if api_key:
             output_messages_key="answer",
         )
 
-        # Display Chat History FIRST
-        session_history = get_session_history(session_id)
-        for msg in session_history.messages:
-            if msg.type == 'human':
-                with st.chat_message("user"):
-                    st.write(msg.content)
-            else:
-                with st.chat_message("assistant"):
+        # UI for Chat
+        chat_container = st.container()
+        with chat_container:
+            session_history = get_session_history(session_id)
+            for msg in session_history.messages:
+                with st.chat_message("user" if msg.type == 'human' else "assistant"):
                     st.write(msg.content)
 
-        user_input = st.chat_input("Ask your question here...")
+        user_input = st.chat_input("Ask about your PDF or loaded websites...")
 
         if user_input:
-            # Display current user message immediately
             with st.chat_message("user"):
                 st.write(user_input)
 
             with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
+                with st.spinner("Searching and thinking..."):
                     response = conversational_rag_chain.invoke(
                         {"input": user_input},
                         config={"configurable": {"session_id": session_id}}
                     )
                     st.write(response['answer'])
-
+    else:
+        st.info("👈 Please load some documents or URLs in the sidebar to start chatting.")
 else:
-    st.warning("Please enter a valid API key in the sidebar to start.")
+    st.warning("Please provide a Groq API Key to start.")
